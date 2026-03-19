@@ -20,6 +20,14 @@ namespace Sklad_System
             try
             {
                 db.СоздатьТаблицы();
+
+                // АВТОМАТИЧЕСКАЯ ОЧИСТКА ПРИ ЗАПУСКЕ
+                int очищено = db.ОчиститьПросроченныеПартии();
+                if (очищено > 0)
+                {
+                    Console.WriteLine($"Автоматически очищено просроченных партий: {очищено}");
+                }
+
                 Авторизация();
 
                 if (текущийПользователь != null)
@@ -81,6 +89,7 @@ namespace Sklad_System
                     Console.WriteLine("4. Управление товарами");
                     Console.WriteLine("5. Отчет по истекающим срокам");
                     Console.WriteLine("6. Просмотр логов");
+                    Console.WriteLine("7. Очистка просроченных товаров");
                 }
 
                 Console.WriteLine("0. Выход");
@@ -96,6 +105,7 @@ namespace Sklad_System
                     case "4": if (текущийПользователь.Роль_Пользователя == "Менеджер") УправлениеТоварами(); break;
                     case "5": if (текущийПользователь.Роль_Пользователя == "Менеджер") ОтчетПоСрокам(); break;
                     case "6": if (текущийПользователь.Роль_Пользователя == "Менеджер") ПросмотрЛогов(); break;
+                    case "7": if (текущийПользователь.Роль_Пользователя == "Менеджер") ОчисткаПросроченных(); break;
                     case "0":
                         Logger.Log(текущийПользователь.Идентификатор, "Выход из системы");
                         return;
@@ -310,10 +320,14 @@ namespace Sklad_System
 
                     foreach (var item in остатки)
                     {
-                        if (item.Статус == "КРИТИЧЕСКИЙ")
+                        if (item.Статус == "ПРОСРОЧЕНО")
                             Console.ForegroundColor = ConsoleColor.Red;
+                        else if (item.Статус == "КРИТИЧЕСКИЙ")
+                            Console.ForegroundColor = ConsoleColor.Magenta;
                         else if (item.Статус == "Скоро истекает")
                             Console.ForegroundColor = ConsoleColor.Yellow;
+                        else
+                            Console.ForegroundColor = ConsoleColor.Green;
 
                         Console.WriteLine($"{item.Товар,-20} {item.Номер_партии,-8} {item.Срок_годности:dd.MM.yyyy,-15} {item.Количество,-8} {item.Статус,-15}");
 
@@ -556,6 +570,223 @@ namespace Sklad_System
             }
 
             Console.WriteLine("\nНажмите любую клавишу...");
+            Console.ReadKey();
+        }
+
+        static void ОчисткаПросроченных()
+        {
+            Console.Clear();
+            Console.WriteLine("=== ОЧИСТКА ПРОСРОЧЕННЫХ ТОВАРОВ ===");
+            Console.WriteLine();
+
+            try
+            {
+                Console.WriteLine("ТЕКУЩИЕ ОСТАТКИ ДО ОЧИСТКИ:");
+                Console.WriteLine($"{"Товар",-20} {"Партия",-8} {"Срок годности",-15} {"Кол-во",-8} {"Статус",-15}");
+                Console.WriteLine(new string('-', 70));
+
+                var остаткиДо = db.ОстаткиПоПартиям();
+                foreach (var item in остаткиДо)
+                {
+                    if (item.Статус == "ПРОСРОЧЕНО")
+                        Console.ForegroundColor = ConsoleColor.Red;
+                    else if (item.Статус == "КРИТИЧЕСКИЙ")
+                        Console.ForegroundColor = ConsoleColor.Magenta;
+                    else if (item.Статус == "Скоро истекает")
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                    else
+                        Console.ForegroundColor = ConsoleColor.Green;
+
+                    Console.WriteLine($"{item.Товар,-20} {item.Номер_партии,-8} {item.Срок_годности:dd.MM.yyyy,-15} {item.Количество,-8} {item.Статус,-15}");
+                    Console.ResetColor();
+                }
+
+                Console.WriteLine("\n" + new string('=', 70));
+
+                Console.WriteLine("\nПОИСК ПРОСРОЧЕННЫХ ПАРТИЙ...");
+                var просроченные = db.GetПросроченныеПартии();
+
+                if (просроченные.Count == 0)
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine("✅ Просроченных товаров нет!");
+                    Console.ResetColor();
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"⚠️ Найдено просроченных партий: {просроченные.Count}");
+                    Console.ResetColor();
+                    Console.WriteLine();
+
+                    Console.WriteLine($"{"№",-5} {"Товар",-20} {"Партия",-8} {"Срок годности",-15} {"Кол-во",-8}");
+                    Console.WriteLine(new string('-', 60));
+
+                    for (int i = 0; i < просроченные.Count; i++)
+                    {
+                        var п = просроченные[i];
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine($"{i + 1,-5} {п.НазваниеТовара,-20} {п.Номер_партии,-8} {п.Срок_годности:dd.MM.yyyy,-15} {п.Количество,-8}");
+                        Console.ResetColor();
+                    }
+                }
+
+                Console.WriteLine();
+                Console.WriteLine(new string('=', 70));
+                Console.WriteLine("ВЫБЕРИТЕ ДЕЙСТВИЕ:");
+                Console.WriteLine("1. Деактивировать все просроченные партии (рекомендуется)");
+                Console.WriteLine("2. Полностью удалить все просроченные партии из БД");
+                Console.WriteLine("3. Показать детальную информацию о просрочках");
+                Console.WriteLine("4. Автоматическая очистка (деактивировать всё просроченное)");
+                Console.WriteLine("0. Назад в меню");
+                Console.Write("Ваш выбор: ");
+
+                string choice = Console.ReadLine();
+                Console.WriteLine();
+
+                switch (choice)
+                {
+                    case "1":
+                        Console.Write("Деактивировать все просроченные партии? (y/n): ");
+                        if (Console.ReadLine().ToLower() == "y")
+                        {
+                            int деактивировано = db.ОчиститьПросроченныеПартии();
+
+                            if (деактивировано > 0)
+                            {
+                                Console.ForegroundColor = ConsoleColor.Green;
+                                Console.WriteLine($"✅ Деактивировано партий: {деактивировано}");
+                                Console.ResetColor();
+                                Logger.Log(текущийПользователь.Идентификатор, $"Деактивировано просроченных партий: {деактивировано}");
+                            }
+                            else
+                            {
+                                Console.WriteLine("Нет партий для деактивации");
+                            }
+                        }
+                        break;
+
+                    case "2":
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine("⚠️ ВНИМАНИЕ! Это действие необратимо!");
+                        Console.ResetColor();
+                        Console.Write("Вы уверены, что хотите УДАЛИТЬ все просроченные партии? (y/n): ");
+
+                        if (Console.ReadLine().ToLower() == "y")
+                        {
+                            Console.Write("Для подтверждения введите 'DELETE': ");
+                            if (Console.ReadLine() == "DELETE")
+                            {
+                                int удалено = db.УдалитьПросроченныеПартии();
+                                Console.ForegroundColor = ConsoleColor.Green;
+                                Console.WriteLine($"✅ Удалено партий: {удалено}");
+                                Console.ResetColor();
+                                Logger.Log(текущийПользователь.Идентификатор, $"Удалено просроченных партий: {удалено}");
+                            }
+                            else
+                            {
+                                Console.WriteLine("Операция отменена");
+                            }
+                        }
+                        break;
+
+                    case "3":
+                        Console.WriteLine("\nДЕТАЛЬНАЯ ИНФОРМАЦИЯ О ПРОСРОЧКАХ:");
+
+                        using (var conn = new SqlConnection(db.connectionString))
+                        {
+                            var детально = conn.Query(@"
+                        SELECT 
+                            Т.Название AS Товар,
+                            П.Номер_партии,
+                            П.Срок_годности,
+                            П.Количество,
+                            DATEDIFF(day, П.Срок_годности, GETDATE()) AS ДнейПросрочено,
+                            П.Цена_закупки,
+                            П.Активна
+                        FROM Партии П
+                        JOIN Товары Т ON П.Номер_товара = Т.Номер_товара
+                        WHERE П.Срок_годности < GETDATE() 
+                            AND П.Количество > 0
+                        ORDER BY П.Срок_годности").ToList();
+
+                            if (детально.Count > 0)
+                            {
+                                Console.WriteLine($"{"Товар",-20} {"Партия",-8} {"Просрочен с",-15} {"Дней",-6} {"Кол-во",-8} {"Активна",-8}");
+                                Console.WriteLine(new string('-', 70));
+
+                                foreach (var д in детально)
+                                {
+                                    Console.ForegroundColor = д.Активна ? ConsoleColor.Red : ConsoleColor.DarkRed;
+                                    Console.WriteLine($"{д.Товар,-20} {д.Номер_партии,-8} {д.Срок_годности:dd.MM.yyyy,-15} {д.ДнейПросрочено,-6} {д.Количество,-8} {(д.Активна ? "Да" : "Нет"),-8}");
+                                    Console.ResetColor();
+                                }
+                            }
+                        }
+                        break;
+
+                    case "4":
+                        Console.WriteLine("Запуск автоматической очистки...");
+                        int автоочистка = db.ОчиститьПросроченныеПартии();
+
+                        if (автоочистка > 0)
+                        {
+                            Console.ForegroundColor = ConsoleColor.Green;
+                            Console.WriteLine($"✅ Автоматически деактивировано партий: {автоочистка}");
+                            Console.ResetColor();
+                            Logger.Log(текущийПользователь.Идентификатор, $"Автоматическая очистка: {автоочистка} партий");
+                        }
+                        else
+                        {
+                            Console.WriteLine("Просроченных партий не найдено");
+                        }
+                        break;
+
+                    case "0":
+                        return;
+                }
+
+                if (choice != "0" && choice != "3")
+                {
+                    Console.WriteLine("\n" + new string('=', 70));
+                    Console.WriteLine("ОСТАТКИ ПОСЛЕ ОЧИСТКИ:");
+
+                    var остаткиПосле = db.ОстаткиПоПартиям();
+                    if (остаткиПосле.Count == 0)
+                    {
+                        Console.WriteLine("Склад пуст");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"{"Товар",-20} {"Партия",-8} {"Срок годности",-15} {"Кол-во",-8} {"Статус",-15}");
+                        Console.WriteLine(new string('-', 70));
+
+                        foreach (var item in остаткиПосле)
+                        {
+                            if (item.Статус == "ПРОСРОЧЕНО")
+                                Console.ForegroundColor = ConsoleColor.Red;
+                            else if (item.Статус == "КРИТИЧЕСКИЙ")
+                                Console.ForegroundColor = ConsoleColor.Magenta;
+                            else if (item.Статус == "Скоро истекает")
+                                Console.ForegroundColor = ConsoleColor.Yellow;
+                            else
+                                Console.ForegroundColor = ConsoleColor.Green;
+
+                            Console.WriteLine($"{item.Товар,-20} {item.Номер_партии,-8} {item.Срок_годности:dd.MM.yyyy,-15} {item.Количество,-8} {item.Статус,-15}");
+                            Console.ResetColor();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"❌ Ошибка: {ex.Message}");
+                Console.ResetColor();
+                Logger.Log(текущийПользователь.Идентификатор, "Ошибка при очистке просроченных", ex);
+            }
+
+            Console.WriteLine("\nНажмите любую клавишу для продолжения...");
             Console.ReadKey();
         }
     }
