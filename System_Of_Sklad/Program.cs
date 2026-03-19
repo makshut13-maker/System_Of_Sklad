@@ -18,10 +18,7 @@ namespace Sklad_System
 
             try
             {
-                // Создаем таблицы при первом запуске
                 db.СоздатьТаблицы();
-
-                // Авторизация
                 Авторизация();
 
                 if (текущийПользователь != null)
@@ -73,6 +70,7 @@ namespace Sklad_System
                 Console.WriteLine($"Пользователь: {текущийПользователь.Идентификатор} ({текущийПользователь.Роль_Пользователя})");
                 Console.WriteLine("==========================");
 
+                Console.WriteLine("1. Приемка товара");
                 Console.WriteLine("0. Выход");
                 Console.Write("Выберите действие: ");
 
@@ -80,10 +78,100 @@ namespace Sklad_System
 
                 switch (choice)
                 {
+                    case "1": Приемка(); break;
                     case "0":
                         return;
                 }
             }
+        }
+
+        static void Приемка()
+        {
+            Console.Clear();
+            Console.WriteLine("=== ПРИЕМКА ТОВАРА ===");
+
+            try
+            {
+                var товары = db.ВсеТовары();
+                if (товары.Count == 0)
+                {
+                    Console.WriteLine("Сначала добавьте товары!");
+                    Console.ReadKey();
+                    return;
+                }
+
+                Console.WriteLine("\nДоступные товары:");
+                foreach (var т in товары)
+                {
+                    Console.WriteLine($"{т.Номер_товара}. {т.Название} (ср.цена: {т.Средняя_рыночная_цена} руб.)");
+                }
+
+                Console.Write("\nВыберите номер товара: ");
+                if (!int.TryParse(Console.ReadLine(), out int номерТовара))
+                {
+                    Console.WriteLine("Ошибка ввода!");
+                    Console.ReadKey();
+                    return;
+                }
+
+                var выбранныйТовар = товары.FirstOrDefault(t => t.Номер_товара == номерТовара);
+                if (выбранныйТовар == null)
+                {
+                    Console.WriteLine("Товар не найден!");
+                    Console.ReadKey();
+                    return;
+                }
+
+                Console.Write("Цена закупки: ");
+                if (!decimal.TryParse(Console.ReadLine(), out decimal цена))
+                {
+                    Console.WriteLine("Ошибка ввода!");
+                    Console.ReadKey();
+                    return;
+                }
+
+                if (!db.ПроверитьЦену(номерТовара, цена))
+                {
+                    Console.WriteLine($"Ошибка: Цена закупки не может быть выше средней более чем на 10%!");
+                    Console.WriteLine($"Максимальная цена: {выбранныйТовар.Средняя_рыночная_цена * 1.1m} руб.");
+                    Console.ReadKey();
+                    return;
+                }
+
+                Console.Write("Срок годности (ГГГГ-ММ-ДД): ");
+                if (!DateTime.TryParse(Console.ReadLine(), out DateTime срок))
+                {
+                    Console.WriteLine("Ошибка ввода даты!");
+                    Console.ReadKey();
+                    return;
+                }
+
+                Console.Write("Количество: ");
+                if (!int.TryParse(Console.ReadLine(), out int количество) || количество <= 0)
+                {
+                    Console.WriteLine("Ошибка ввода количества!");
+                    Console.ReadKey();
+                    return;
+                }
+
+                var партия = new Партия
+                {
+                    Номер_товара = номерТовара,
+                    Срок_годности = срок,
+                    Цена_закупки = цена,
+                    Количество = количество,
+                    Активна = true
+                };
+
+                db.ДобавитьПартию(партия);
+                Console.WriteLine("✓ Товар успешно принят на склад!");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Ошибка: {ex.Message}");
+            }
+
+            Console.ReadKey();
         }
     }
 }
