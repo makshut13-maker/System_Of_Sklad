@@ -186,5 +186,93 @@ namespace Sklad_System
                 }
             }
         }
+
+        // ========== ОТЧЕТЫ ==========
+        public List<Остаток> ОстаткиПоПартиям()
+        {
+            using (var conn = new SqlConnection(connectionString))
+            {
+                string sql = @"
+            SELECT 
+                Т.Название AS Товар,
+                П.Номер_партии,
+                П.Срок_годности,
+                П.Количество,
+                П.Цена_закупки AS Цена,
+                CASE 
+                    WHEN П.Срок_годности < GETDATE() THEN 'ПРОСРОЧЕНО'
+                    WHEN DATEDIFF(day, GETDATE(), П.Срок_годности) <= 3 THEN 'КРИТИЧЕСКИЙ'
+                    WHEN DATEDIFF(day, GETDATE(), П.Срок_годности) <= 7 THEN 'Скоро истекает'
+                    ELSE 'Норма'
+                END AS Статус
+            FROM Партии П
+            JOIN Товары Т ON П.Номер_товара = Т.Номер_товара
+            WHERE П.Количество > 0 
+              AND П.Активна = 1
+            ORDER BY П.Срок_годности";
+
+                return conn.Query<Остаток>(sql).ToList();
+            }
+        }
+
+        public List<Остаток> ИстекаетЧерез7Дней()
+        {
+            using (var conn = new SqlConnection(connectionString))
+            {
+                string sql = @"
+                    SELECT 
+                        Т.Название AS Товар,
+                        П.Номер_партии,
+                        П.Срок_годности,
+                        П.Количество,
+                        П.Цена_закупки AS Цена,
+                        DATEDIFF(day, GETDATE(), П.Срок_годности) AS ДнейОсталось
+                    FROM Партии П
+                    JOIN Товары Т ON П.Номер_товара = Т.Номер_товара
+                    WHERE П.Количество > 0 
+                        AND DATEDIFF(day, GETDATE(), П.Срок_годности) BETWEEN 0 AND 7
+                    ORDER BY П.Срок_годности";
+
+                return conn.Query<Остаток>(sql).ToList();
+            }
+        }
+
+        // ========== ПОЛЬЗОВАТЕЛИ ==========
+        public Пользователь Войти(string логин)
+        {
+            using (var conn = new SqlConnection(connectionString))
+            {
+                return conn.QueryFirstOrDefault<Пользователь>(
+                    "SELECT Идентификатор, Роль_Пользователя FROM Пользователи WHERE Идентификатор = @login",
+                    new { login = логин });
+            }
+        }
+
+        // ========== ЛОГИ (просмотр для менеджера) ==========
+        public List<Лог> ПоследниеЛоги(int количество = 20)
+        {
+            using (var conn = new SqlConnection(connectionString))
+            {
+                return conn.Query<Лог>("SELECT TOP (@count) * FROM Журнал ORDER BY Время DESC",
+                    new { count = количество }).ToList();
+            }
+        }
+
+        // ========== ЛОГИРОВАНИЕ ==========
+        public void ДобавитьВЖурнал(string пользователь, string действие)
+        {
+            try
+            {
+                using (var conn = new SqlConnection(connectionString))
+                {
+                    string sql = "INSERT INTO Журнал (Пользователь, Действие, Время) VALUES (@user, @action, @time)";
+                    conn.Execute(sql, new { user = пользователь, action = действие, time = DateTime.Now });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Не удалось записать в журнал БД: {ex.Message}");
+            }
+        }
     }
 }
