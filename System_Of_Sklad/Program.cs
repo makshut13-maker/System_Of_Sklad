@@ -71,6 +71,7 @@ namespace Sklad_System
                 Console.WriteLine("==========================");
 
                 Console.WriteLine("1. Приемка товара");
+                Console.WriteLine("2. Списание товара");
                 Console.WriteLine("0. Выход");
                 Console.Write("Выберите действие: ");
 
@@ -79,6 +80,7 @@ namespace Sklad_System
                 switch (choice)
                 {
                     case "1": Приемка(); break;
+                    case "2": Списание(); break;
                     case "0":
                         return;
                 }
@@ -165,6 +167,97 @@ namespace Sklad_System
 
                 db.ДобавитьПартию(партия);
                 Console.WriteLine("✓ Товар успешно принят на склад!");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Ошибка: {ex.Message}");
+            }
+
+            Console.ReadKey();
+        }
+
+        static void Списание()
+        {
+            Console.Clear();
+            Console.WriteLine("=== СПИСАНИЕ ТОВАРА ===");
+
+            try
+            {
+                var товары = db.ВсеТовары();
+                if (товары.Count == 0)
+                {
+                    Console.WriteLine("Нет товаров!");
+                    Console.ReadKey();
+                    return;
+                }
+
+                Console.WriteLine("\nДоступные товары:");
+                foreach (var т in товары)
+                {
+                    Console.WriteLine($"{т.Номер_товара}. {т.Название}");
+                }
+
+                Console.Write("\nВыберите номер товара: ");
+                if (!int.TryParse(Console.ReadLine(), out int номерТовара))
+                {
+                    Console.WriteLine("Ошибка ввода!");
+                    Console.ReadKey();
+                    return;
+                }
+
+                Console.Write("Сколько списать: ");
+                if (!int.TryParse(Console.ReadLine(), out int нужноКоличество) || нужноКоличество <= 0)
+                {
+                    Console.WriteLine("Ошибка ввода!");
+                    Console.ReadKey();
+                    return;
+                }
+
+                var партии = db.ПартииДляСписания(номерТовара, нужноКоличество);
+
+                if (партии.Count == 0)
+                {
+                    Console.WriteLine("Нет доступных партий для списания!");
+                    Console.ReadKey();
+                    return;
+                }
+
+                Console.WriteLine("\nПартии для списания (FEFO порядок):");
+                int всего = 0;
+                foreach (var п in партии)
+                {
+                    Console.WriteLine($"Партия {п.Номер_партии}: срок {п.Срок_годности:dd.MM.yyyy}, доступно {п.Количество} шт.");
+                    всего += п.Количество;
+                }
+
+                if (всего < нужноКоличество)
+                {
+                    Console.WriteLine($"\nОшибка: на складе всего {всего} шт., а нужно {нужноКоличество}!");
+                    Console.ReadKey();
+                    return;
+                }
+
+                Console.Write("\nПодтвердите списание (y/n): ");
+                if (Console.ReadLine().ToLower() != "y")
+                {
+                    Console.WriteLine("Списание отменено");
+                    Console.ReadKey();
+                    return;
+                }
+
+                int осталосьСписать = нужноКоличество;
+                foreach (var партия in партии)
+                {
+                    if (осталосьСписать <= 0) break;
+
+                    int списатьСПартии = Math.Min(партия.Количество, осталосьСписать);
+                    db.СписатьТовар(партия.Номер_партии, списатьСПартии, текущийПользователь.Идентификатор);
+
+                    осталосьСписать -= списатьСПартии;
+                    Console.WriteLine($"Списано {списатьСПартии} шт. из партии {партия.Номер_партии}");
+                }
+
+                Console.WriteLine("✓ Списание завершено!");
             }
             catch (Exception ex)
             {
