@@ -73,6 +73,12 @@ namespace Sklad_System
                 Console.WriteLine("1. Приемка товара");
                 Console.WriteLine("2. Списание товара");
                 Console.WriteLine("3. Показать остатки");
+
+                if (текущийПользователь.Роль_Пользователя == "Менеджер")
+                {
+                    Console.WriteLine("4. Управление товарами");
+                }
+
                 Console.WriteLine("0. Выход");
                 Console.Write("Выберите действие: ");
 
@@ -83,6 +89,7 @@ namespace Sklad_System
                     case "1": Приемка(); break;
                     case "2": Списание(); break;
                     case "3": ПоказатьОстатки(); break;
+                    case "4": if (текущийПользователь.Роль_Пользователя == "Менеджер") УправлениеТоварами(); break;
                     case "0":
                         return;
                 }
@@ -304,6 +311,117 @@ namespace Sklad_System
             catch (Exception ex)
             {
                 Console.WriteLine($"Ошибка: {ex.Message}");
+            }
+
+            Console.ReadKey();
+        }
+
+        static void УправлениеТоварами()
+        {
+            while (true)
+            {
+                Console.Clear();
+                Console.WriteLine("=== УПРАВЛЕНИЕ ТОВАРАМИ ===");
+
+                var товары = db.ВсеТовары();
+                if (товары.Count > 0)
+                {
+                    Console.WriteLine("\nСписок товаров:");
+                    foreach (var т in товары)
+                    {
+                        Console.WriteLine($"{т.Номер_товара}. {т.Название} - {т.Средняя_рыночная_цена} руб.");
+                    }
+                }
+
+                Console.WriteLine("\n1. Добавить товар");
+                Console.WriteLine("2. Удалить товар");
+                Console.WriteLine("0. Назад");
+                Console.Write("Выберите действие: ");
+
+                string choice = Console.ReadLine();
+                if (choice == "0") break;
+
+                if (choice == "1")
+                {
+                    ДобавитьТовар();
+                }
+                else if (choice == "2")
+                {
+                    УдалитьТовар();
+                }
+            }
+        }
+
+        static void ДобавитьТовар()
+        {
+            Console.Clear();
+            Console.WriteLine("=== ДОБАВЛЕНИЕ ТОВАРА ===");
+
+            try
+            {
+                Console.Write("Название товара: ");
+                string название = Console.ReadLine();
+
+                Console.Write("Средняя рыночная цена: ");
+                if (!decimal.TryParse(Console.ReadLine(), out decimal цена) || цена <= 0)
+                {
+                    Console.WriteLine("Ошибка ввода цены!");
+                    Console.ReadKey();
+                    return;
+                }
+
+                var товар = new Товар
+                {
+                    Название = название,
+                    Средняя_рыночная_цена = цена
+                };
+
+                db.ДобавитьТовар(товар);
+                Console.WriteLine("✓ Товар добавлен!");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Ошибка: {ex.Message}");
+            }
+
+            Console.ReadKey();
+        }
+
+        static void УдалитьТовар()
+        {
+            Console.Clear();
+            Console.WriteLine("=== УДАЛЕНИЕ ТОВАРА ===");
+
+            var товары = db.ВсеТовары();
+            if (товары.Count == 0)
+            {
+                Console.WriteLine("Нет товаров для удаления!");
+                Console.ReadKey();
+                return;
+            }
+
+            Console.WriteLine("\nСписок товаров:");
+            foreach (var т in товары)
+            {
+                Console.WriteLine($"{т.Номер_товара}. {т.Название}");
+            }
+
+            Console.Write("\nВведите номер товара для удаления: ");
+            if (!int.TryParse(Console.ReadLine(), out int номерТовара))
+            {
+                Console.WriteLine("Ошибка ввода!");
+                Console.ReadKey();
+                return;
+            }
+
+            if (db.МожноУдалитьТовар(номерТовара))
+            {
+                db.УдалитьТовар(номерТовара);
+                Console.WriteLine("✓ Товар удален!");
+            }
+            else
+            {
+                Console.WriteLine("Ошибка: Нельзя удалить товар - есть активные партии!");
             }
 
             Console.ReadKey();
