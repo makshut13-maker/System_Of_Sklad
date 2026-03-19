@@ -72,6 +72,7 @@ namespace Sklad_System
 
                 Console.WriteLine("1. Приемка товара");
                 Console.WriteLine("2. Списание товара");
+                Console.WriteLine("3. Показать остатки");
                 Console.WriteLine("0. Выход");
                 Console.Write("Выберите действие: ");
 
@@ -81,6 +82,7 @@ namespace Sklad_System
                 {
                     case "1": Приемка(); break;
                     case "2": Списание(); break;
+                    case "3": ПоказатьОстатки(); break;
                     case "0":
                         return;
                 }
@@ -258,6 +260,46 @@ namespace Sklad_System
                 }
 
                 Console.WriteLine("✓ Списание завершено!");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Ошибка: {ex.Message}");
+            }
+
+            Console.ReadKey();
+        }
+
+        static void ПоказатьОстатки()
+        {
+            Console.Clear();
+            Console.WriteLine("=== ОСТАТКИ НА СКЛАДЕ ===");
+            Console.WriteLine();
+
+            try
+            {
+                var остатки = db.ОстаткиПоПартиям();
+
+                if (остатки.Count == 0)
+                {
+                    Console.WriteLine("Склад пуст");
+                }
+                else
+                {
+                    Console.WriteLine($"{"Товар",-20} {"Партия",-8} {"Срок годности",-15} {"Кол-во",-8} {"Статус",-15}");
+                    Console.WriteLine(new string('-', 70));
+
+                    foreach (var item in остатки)
+                    {
+                        if (item.Статус == "КРИТИЧЕСКИЙ")
+                            Console.ForegroundColor = ConsoleColor.Red;
+                        else if (item.Статус == "Скоро истекает")
+                            Console.ForegroundColor = ConsoleColor.Yellow;
+
+                        Console.WriteLine($"{item.Товар,-20} {item.Номер_партии,-8} {item.Срок_годности:dd.MM.yyyy,-15} {item.Количество,-8} {item.Статус,-15}");
+
+                        Console.ResetColor();
+                    }
+                }
             }
             catch (Exception ex)
             {
