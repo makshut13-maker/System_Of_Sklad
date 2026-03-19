@@ -142,5 +142,49 @@ namespace Sklad_System
                 return conn.Query<Партия>("SELECT * FROM Партии WHERE Активна = 1").ToList();
             }
         }
+
+        // ========== СПИСАНИЕ ==========
+        public List<Партия> ПартииДляСписания(int номерТовара, int количество)
+        {
+            using (var conn = new SqlConnection(connectionString))
+            {
+                string sql = @"
+                    SELECT * FROM Партии 
+                    WHERE Номер_товара = @id 
+                        AND Активна = 1 
+                        AND Количество > 0
+                        AND DATEDIFF(day, GETDATE(), Срок_годности) >= 3
+                    ORDER BY Срок_годности";
+
+                return conn.Query<Партия>(sql, new { id = номерТовара }).ToList();
+            }
+        }
+
+        public void СписатьТовар(int номерПартии, int количество, string пользователь)
+        {
+            using (var conn = new SqlConnection(connectionString))
+            {
+                conn.Open();
+                using (var transaction = conn.BeginTransaction())
+                {
+                    conn.Execute("UPDATE Партии SET Количество = Количество - @kol WHERE Номер_партии = @id",
+                        new { kol = количество, id = номерПартии }, transaction);
+
+                    int остаток = conn.QueryFirst<int>("SELECT Количество FROM Партии WHERE Номер_партии = @id",
+                        new { id = номерПартии }, transaction);
+
+                    if (остаток == 0)
+                    {
+                        conn.Execute("UPDATE Партии SET Активна = 0 WHERE Номер_партии = @id",
+                            new { id = номерПартии }, transaction);
+                    }
+
+                    conn.Execute("INSERT INTO Журнал (Пользователь, Действие, Время) VALUES (@user, @action, @time)",
+                        new { user = пользователь, action = $"Списание {количество} шт из партии {номерПартии}", time = DateTime.Now }, transaction);
+
+                    transaction.Commit();
+                }
+            }
+        }
     }
 }
