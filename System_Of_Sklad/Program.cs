@@ -77,6 +77,7 @@ namespace Sklad_System
                 if (текущийПользователь.Роль_Пользователя == "Менеджер")
                 {
                     Console.WriteLine("4. Управление товарами");
+                    Console.WriteLine("5. Отчет по истекающим срокам");
                 }
 
                 Console.WriteLine("0. Выход");
@@ -90,6 +91,7 @@ namespace Sklad_System
                     case "2": Списание(); break;
                     case "3": ПоказатьОстатки(); break;
                     case "4": if (текущийПользователь.Роль_Пользователя == "Менеджер") УправлениеТоварами(); break;
+                    case "5": if (текущийПользователь.Роль_Пользователя == "Менеджер") ОтчетПоСрокам(); break;
                     case "0":
                         return;
                 }
@@ -422,6 +424,48 @@ namespace Sklad_System
             else
             {
                 Console.WriteLine("Ошибка: Нельзя удалить товар - есть активные партии!");
+            }
+
+            Console.ReadKey();
+        }
+
+        static void ОтчетПоСрокам()
+        {
+            Console.Clear();
+            Console.WriteLine("=== ТОВАРЫ С ИСТЕКАЮЩИМ СРОКОМ (7 ДНЕЙ) ===");
+            Console.WriteLine();
+
+            try
+            {
+                var истекающие = db.ИстекаетЧерез7Дней();
+
+                if (истекающие.Count == 0)
+                {
+                    Console.WriteLine("Нет товаров с истекающим сроком");
+                }
+                else
+                {
+                    Console.WriteLine($"{"Товар",-20} {"Партия",-8} {"Срок",-12} {"Кол-во",-8} {"Дней",-6}");
+                    Console.WriteLine(new string('-', 60));
+
+                    foreach (var item in истекающие)
+                    {
+                        string дней = item.Статус;
+
+                        if (int.TryParse(дней, out int днейОсталось) && днейОсталось <= 3)
+                            Console.ForegroundColor = ConsoleColor.Red;
+                        else
+                            Console.ForegroundColor = ConsoleColor.Yellow;
+
+                        Console.WriteLine($"{item.Товар,-20} {item.Номер_партии,-8} {item.Срок_годности:dd.MM.yyyy,-12} {item.Количество,-8} {дней,-6}");
+
+                        Console.ResetColor();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Ошибка: {ex.Message}");
             }
 
             Console.ReadKey();
