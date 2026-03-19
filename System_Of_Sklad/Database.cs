@@ -56,6 +56,31 @@ namespace Sklad_System
                 Действие NVARCHAR(500) NOT NULL,
                 Время DATETIME NOT NULL
             )");
+
+                // Добавим тестового пользователя, если нет
+                var user = conn.QueryFirstOrDefault("SELECT * FROM Пользователи WHERE Идентификатор = 'admin'");
+                if (user == null)
+                {
+                    conn.Execute("INSERT INTO Пользователи (Идентификатор, Роль_Пользователя) VALUES ('admin', 'Менеджер')");
+                    conn.Execute("INSERT INTO Пользователи (Идентификатор, Роль_Пользователя) VALUES ('worker', 'Кладовщик')");
+                }
+            }
+        }
+
+        // ========== ТОВАРЫ ==========
+        public List<Товар> ВсеТовары()
+        {
+            using (var conn = new SqlConnection(connectionString))
+            {
+                return conn.Query<Товар>("SELECT * FROM Товары").ToList();
+            }
+        }
+
+        public void ДобавитьТовар(Товар товар)
+        {
+            using (var conn = new SqlConnection(connectionString))
+            {
+                conn.Execute("INSERT INTO Товары (Название, Средняя_рыночная_цена) VALUES (@Название, @Средняя_рыночная_цена)", товар);
             }
         }
     }
