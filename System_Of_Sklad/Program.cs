@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
+using System.IO;
 using System.Linq;
 using Dapper;
 
@@ -23,6 +24,7 @@ namespace Sklad_System
 
                 if (текущийПользователь != null)
                 {
+                    Logger.Log(текущийПользователь.Идентификатор, "Вход в систему");
                     ГлавноеМеню();
                 }
             }
@@ -78,6 +80,7 @@ namespace Sklad_System
                 {
                     Console.WriteLine("4. Управление товарами");
                     Console.WriteLine("5. Отчет по истекающим срокам");
+                    Console.WriteLine("6. Просмотр логов");
                 }
 
                 Console.WriteLine("0. Выход");
@@ -92,7 +95,9 @@ namespace Sklad_System
                     case "3": ПоказатьОстатки(); break;
                     case "4": if (текущийПользователь.Роль_Пользователя == "Менеджер") УправлениеТоварами(); break;
                     case "5": if (текущийПользователь.Роль_Пользователя == "Менеджер") ОтчетПоСрокам(); break;
+                    case "6": if (текущийПользователь.Роль_Пользователя == "Менеджер") ПросмотрЛогов(); break;
                     case "0":
+                        Logger.Log(текущийПользователь.Идентификатор, "Выход из системы");
                         return;
                 }
             }
@@ -123,6 +128,7 @@ namespace Sklad_System
                 if (!int.TryParse(Console.ReadLine(), out int номерТовара))
                 {
                     Console.WriteLine("Ошибка ввода!");
+                    Logger.Log(текущийПользователь.Идентификатор, "Ошибка при приемке: неверный формат");
                     Console.ReadKey();
                     return;
                 }
@@ -147,6 +153,7 @@ namespace Sklad_System
                 {
                     Console.WriteLine($"Ошибка: Цена закупки не может быть выше средней более чем на 10%!");
                     Console.WriteLine($"Максимальная цена: {выбранныйТовар.Средняя_рыночная_цена * 1.1m} руб.");
+                    Logger.Log(текущийПользователь.Идентификатор, $"Отказ в приемке: цена {цена} выше допустимой");
                     Console.ReadKey();
                     return;
                 }
@@ -178,10 +185,12 @@ namespace Sklad_System
 
                 db.ДобавитьПартию(партия);
                 Console.WriteLine("✓ Товар успешно принят на склад!");
+                Logger.Log(текущийПользователь.Идентификатор, $"Приемка: {выбранныйТовар.Название}, {количество} шт, цена {цена} руб.");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Ошибка: {ex.Message}");
+                Logger.Log(текущийПользователь.Идентификатор, "Ошибка при приемке", ex);
             }
 
             Console.ReadKey();
@@ -269,10 +278,12 @@ namespace Sklad_System
                 }
 
                 Console.WriteLine("✓ Списание завершено!");
+                Logger.Log(текущийПользователь.Идентификатор, $"Списание: товар ID {номерТовара}, {нужноКоличество} шт.");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Ошибка: {ex.Message}");
+                Logger.Log(текущийПользователь.Идентификатор, "Ошибка при списании", ex);
             }
 
             Console.ReadKey();
@@ -309,10 +320,13 @@ namespace Sklad_System
                         Console.ResetColor();
                     }
                 }
+
+                Logger.Log(текущийПользователь.Идентификатор, "Просмотр остатков");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Ошибка: {ex.Message}");
+                Logger.Log(текущийПользователь.Идентификатор, "Ошибка при просмотре остатков", ex);
             }
 
             Console.ReadKey();
@@ -380,10 +394,12 @@ namespace Sklad_System
 
                 db.ДобавитьТовар(товар);
                 Console.WriteLine("✓ Товар добавлен!");
+                Logger.Log(текущийПользователь.Идентификатор, $"Добавлен товар: {название}, цена {цена} руб.");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Ошибка: {ex.Message}");
+                Logger.Log(текущийПользователь.Идентификатор, "Ошибка при добавлении товара", ex);
             }
 
             Console.ReadKey();
@@ -420,10 +436,12 @@ namespace Sklad_System
             {
                 db.УдалитьТовар(номерТовара);
                 Console.WriteLine("✓ Товар удален!");
+                Logger.Log(текущийПользователь.Идентификатор, $"Удален товар ID {номерТовара}");
             }
             else
             {
                 Console.WriteLine("Ошибка: Нельзя удалить товар - есть активные партии!");
+                Logger.Log(текущийПользователь.Идентификатор, $"Попытка удалить товар ID {номерТовара} с активными партиями");
             }
 
             Console.ReadKey();
@@ -462,12 +480,82 @@ namespace Sklad_System
                         Console.ResetColor();
                     }
                 }
+
+                Logger.Log(текущийПользователь.Идентификатор, "Просмотр отчета по срокам");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Ошибка: {ex.Message}");
+                Logger.Log(текущийПользователь.Идентификатор, "Ошибка при просмотре отчета", ex);
             }
 
+            Console.ReadKey();
+        }
+
+        static void ПросмотрЛогов()
+        {
+            Console.Clear();
+            Console.WriteLine("=== ЖУРНАЛ ДЕЙСТВИЙ ===");
+            Console.WriteLine();
+
+            try
+            {
+                var логи = db.ПоследниеЛоги(30);
+
+                if (логи.Count == 0)
+                {
+                    Console.WriteLine("Журнал в БД пуст");
+                }
+                else
+                {
+                    Console.WriteLine("--- Логи из базы данных ---");
+                    Console.WriteLine($"{"Время",-20} {"Пользователь",-15} {"Действие"}");
+                    Console.WriteLine(new string('-', 80));
+
+                    foreach (var лог in логи)
+                    {
+                        Console.WriteLine($"{лог.Время:yyyy-MM-dd HH:mm:ss,-20} {лог.Пользователь,-15} {лог.Действие}");
+                    }
+                }
+
+                Console.WriteLine("\n--- Файловый лог (actions.log) ---");
+                if (File.Exists("actions.log"))
+                {
+                    var lines = File.ReadAllLines("actions.log");
+
+                    if (lines.Length == 0)
+                    {
+                        Console.WriteLine("Файл лога пуст");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Всего записей: {lines.Length}");
+                        Console.WriteLine("Последние 15 записей:");
+                        Console.WriteLine(new string('-', 80));
+
+                        int startIndex = Math.Max(0, lines.Length - 15);
+                        for (int i = startIndex; i < lines.Length; i++)
+                        {
+                            if (lines[i].Contains("Ошибка"))
+                                Console.ForegroundColor = ConsoleColor.Red;
+
+                            Console.WriteLine(lines[i]);
+
+                            Console.ResetColor();
+                        }
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("Файл actions.log еще не создан");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Ошибка при просмотре логов: {ex.Message}");
+            }
+
+            Console.WriteLine("\nНажмите любую клавишу...");
             Console.ReadKey();
         }
     }
