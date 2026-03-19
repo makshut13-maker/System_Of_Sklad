@@ -38,6 +38,24 @@ namespace Sklad_System
                 Цена_закупки DECIMAL(18,2) NOT NULL,
                 Количество INT NOT NULL DEFAULT 0
             )");
+
+                // Таблица Пользователи
+                conn.Execute(@"
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Пользователи' AND xtype='U')
+            CREATE TABLE Пользователи (
+                Идентификатор NVARCHAR(100) PRIMARY KEY,
+                Роль_Пользователя NVARCHAR(50) NOT NULL
+            )");
+
+                // Таблица для логов
+                conn.Execute(@"
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Журнал' AND xtype='U')
+            CREATE TABLE Журнал (
+                ID INT PRIMARY KEY IDENTITY(1,1),
+                Пользователь NVARCHAR(100) NOT NULL,
+                Действие NVARCHAR(500) NOT NULL,
+                Время DATETIME NOT NULL
+            )");
             }
         }
     }
