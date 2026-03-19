@@ -26,6 +26,18 @@ namespace Sklad_System
                 Название NVARCHAR(255) NOT NULL,
                 Средняя_рыночная_цена DECIMAL(18,2) NOT NULL
             )");
+
+                // Таблица Партии
+                conn.Execute(@"
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Партии' AND xtype='U')
+            CREATE TABLE Партии (
+                Номер_партии INT PRIMARY KEY IDENTITY(1,1),
+                Номер_товара INT NOT NULL FOREIGN KEY REFERENCES Товары(Номер_товара),
+                Срок_годности DATE NOT NULL,
+                Активна BIT NOT NULL DEFAULT 1,
+                Цена_закупки DECIMAL(18,2) NOT NULL,
+                Количество INT NOT NULL DEFAULT 0
+            )");
             }
         }
     }
